@@ -20,6 +20,39 @@ The model improves prediction and feature selection by identifying **outcome-rel
 - `scripts/` – Analysis and plotting scripts
 - `results/` – Output from simulation and real data analysis
 
+## 🧪 Data Simulation
+
+- **`Simulate_Pure_Communities.R`**  
+  Simulates data from a regression model where the **true coefficients form two distinct clusters**:
+  - One group of features with **positive effects**,
+  - Another group with **negative effects**.
+
+This setup is designed to test the model’s ability to recover outcome-relevant clusters and validate the accuracy of graph-based shrinkage and feature selection.
+
+## 🧾 Code Files
+
+- **`Functions_Graph_Horseshoe.R`**  
+  Contains all functions required to execute the **compositional variable-selection algorithm** in the **absence of prior knowledge**. This version **learns the graph of coefficient scales from the data**, adapting to unknown relationships between predictors and their effects on the outcome.
+
+- **`Graph-Horseshoe-Informed-Priors.R`**  
+  Contains the corresponding functions for the **informed version** of the compositional variable-selection algorithm. This version assumes **prior knowledge of the relationships among predictors** (e.g., from phylogeny or co-abundance) and **centers the prior distribution of edge weights** on those known relationships while still allowing data-adaptive refinement.
+
+## 📜 Analysis Scripts
+
+- **`Run-Sampler-Graph-Results.R`**  
+  Generates the **inferred graph structure** from the fitted model. If a ground-truth graph is available, the script also computes the **Adjusted Rand Index (ARI)** to assess clustering accuracy. Additionally, it includes evaluation metrics such as:
+  - Number of **false positives** and **false negatives** (edges),
+  - **AUROC**, **AUPR**, **F1 score**, and **Matthews Correlation Coefficient (MCC)**.
+
+- **`Run-Sampler-Prediction-Results.R`**  
+  Computes **prediction metrics** based on the fitted model:
+  - **Root Mean Squared Error (RMSE)** on a test set,
+  - **L2 loss** between the true and estimated regression coefficients,
+  - Number of **false positives** and **false negatives** in coefficient selection.
+
+These scripts are intended for post-processing MCMC outputs and evaluating model performance under both simulated and real data settings.
+
+
 ## 📖 Citation
 
 If you use this code, please cite:
@@ -30,21 +63,7 @@ If you use this code, please cite:
 For questions or collaborations, reach out to [Satabdi Saha](mailto:ssaha1@mdanderson.org) 
 
 
-Simulate_Pure_Communities.R - This file is used to simulate data from a regression model with two distinct clusters of coefficients,one with positive 
-effects and the other with negative effects.
 
-Functions_Graph_Horseshoe.R - This file contains all the functions required to execute the compositional variable‐selection algorithm, which infers 
-the weight graph among coefficient scales. It’s designed to run when no prior knowledge of predictor relationships or their effects on the outcome 
-is available.
 
-Graph-Horseshoe-Informed-Priors.R - This file contains all the functions required to execute the compositional variable‐selection algorithm, which infers 
-the weight graph among coefficient scales. It’s designed to run when prior knowledge of predictor relationships or knowledge about their effects on the 
-outcome is available.
 
-Run-Sampler-Graph-Results.R - This file is used to generate the estimated graph output from the algorithm. It computes the inferred graph structure and,
-if the true graph is available, calculates the Adjusted Rand Index to assess clustering accuracy. Additionally, it includes functions to compute the
-number of false positive and false negative edges, as well as evaluation metrics such as AUROC, AUPR, F1 score, and Matthews Correlation Coefficient (MCC).
 
-Run-Sampler-Prediction-Results.R - This file is used to generate the prediction outputs from the algorithm. It calculates the prediction Root Mean Squared 
-Error (RMSE) using a test dataset and computes the L2 loss between the true and estimated regression coefficients. It also evaluates model performance by 
-reporting the number of false positive and false negative coefficient selections.
