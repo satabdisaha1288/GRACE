@@ -8,7 +8,7 @@ This method extends traditional log-contrast regression by:
 
 - Enforcing the **sum-to-zero constraint** through a novel parameterization;
 - Learning the **feature similarity graph** directly from data, rather than relying on fixed structures like phylogenetic trees;
-- Applying a **graph-structured horseshoe prior** for **sparse and smooth shrinkage**;
+- Applying a **graph-adaptive horseshoe prior** for **sparse and smooth shrinkage**;
 - Using a custom **Gibbs sampler with elliptical slice sampling** for scalable inference.
 
 The model improves prediction and feature selection by identifying **outcome-relevant clusters** of covariates. We validate the method through simulations and apply it to a real oral microbiome dataset to uncover associations with **insulin resistance**.
