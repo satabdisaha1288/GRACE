@@ -1,5 +1,5 @@
 ############################################################
-##  Parameters you can tweak ------------------------------
+##  Parameters  ------------------------------
 burn        <- 10000         # iterations to discard in every chain
 K           <- 50          # target number of edges in the final graph
 eps_small   <- 1e-3        # “practically non-zero” threshold for PIP
