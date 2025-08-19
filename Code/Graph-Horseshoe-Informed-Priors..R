@@ -542,254 +542,6 @@ make_metric <- function(psi, omega, beta, sigma2, zeta2, Uop, tau2) {
   term1 + term2
 }
 
-# ---- (2)  Langevin step with metric ---------------------------
-# mala_sample_psi <- function(psi, omega, beta, sigma2, zeta2, Uop,
-#                             tau2, step_var)
-# {
-#   p      <- length(psi)
-#   omega  <- if (is.matrix(omega)) omega else matrix(omega, p, p)
-#
-#   ## diagonal metric  M  and its “Cholesky”  L = M^{−½}
-#   Mdiag  <- make_metric(beta, Uop, sigma2, zeta2, psi, omega, tau2)
-#   L      <- 1 / sqrt(Mdiag)                  # length-p vector
-#
-#   ## gradient and proposal
-#   g      <- gradient_log_posterior(psi, omega, beta,
-#                                    sigma2, zeta2, Uop, tau2)
-#   eps    <- sqrt(pmax(step_var, 1e-10))      # ensure >0
-#   drift  <- 0.5 * (eps^2) * (L^2 * g)        # L^2 is element-wise square
-#   prop   <- psi + drift + eps * L * rnorm(p)
-#
-#   ## log-posterior values
-#   log_curr <- log_posterior(psi,  omega, beta, sigma2, zeta2, Uop, tau2)
-#   log_prop <- log_posterior(prop, omega, beta, sigma2, zeta2, Uop, tau2)
-#
-#   ## proposal densities  q(prop|curr) and q(curr|prop)
-#   q_log <- function(to, from, g_from) {
-#     mu <- from + 0.5 * (eps^2) * (L^2 * g_from)
-#     sum(dnorm(to, mean = mu, sd = eps * L, log = TRUE))
-#   }
-#   log_q_forward <- q_log(prop, psi,  g)
-#   g_prop        <- gradient_log_posterior(prop, omega, beta,
-#                                           sigma2, zeta2, Uop, tau2)
-#   log_q_reverse <- q_log(psi,  prop, g_prop)
-#
-#   ## MH ratio
-#   log_alpha <- (log_prop + log_q_reverse) -
-#     (log_curr + log_q_forward)
-#
-#   accept <- is.finite(log_alpha) && log(runif(1)) < log_alpha
-#   list(psi = if (accept) prop else psi,
-#        accepted = accept)
-# }
-
-# mala_sample_psi <- function(psi, omega, beta, sigma2, zeta2, Uop,
-#                             tau2, step_var)
-# {
-#   p      <- length(psi)
-#   omega  <- if (is.matrix(omega)) omega else matrix(omega, p, p)
-#
-#   ## 1.  current metric & cholesky‐scale
-#   Mdiag     <- make_metric(beta, Uop, sigma2, zeta2, psi, omega, tau2)
-#   L_curr    <- 1/sqrt(Mdiag)                  # length‐p
-#
-#   ## 2.  gradient at current ψ
-#   g_curr    <- gradient_log_posterior(psi, omega, beta,
-#                                       sigma2, zeta2, Uop, tau2)
-#
-#
-#
-#   ## 3.  proposal (using L_curr)
-#   eps       <- sqrt(pmax(step_var, 1e-10))
-#   drift     <- 0.5*(eps^2)*(L_curr^2 * g_curr)
-#   prop      <- psi + drift + eps * L_curr * rnorm(p)
-#
-#   ## 4.  compute metric at prop and its scale
-#   Mdiag_p   <- make_metric(beta, Uop, sigma2, zeta2, prop, omega, tau2)
-#   L_prop    <- 1/sqrt(Mdiag_p)
-#
-#   ## 5.  log‐posteriors
-#   log_curr  <- log_posterior(psi,  omega, beta, sigma2, zeta2, Uop, tau2)
-#   log_prop  <- log_posterior(prop, omega, beta, sigma2, zeta2, Uop, tau2)
-#
-#   ## 6.  a flexible q_log that takes the L‐vector
-#   q_log <- function(to, from, g_from, Lvec) {
-#     mu  <- from + 0.5 * (eps^2) * (Lvec^2 * g_from)
-#     sum(dnorm(to, mean = mu, sd = eps * Lvec, log = TRUE))
-#   }
-#
-#   ## 7.  forward & reverse proposals
-#   log_q_fwd <- q_log(prop, psi,   g_curr,  L_curr)
-#   g_prop    <- gradient_log_posterior(prop, omega, beta,
-#                                       sigma2, zeta2, Uop, tau2)
-#   log_q_rev <- q_log(psi,  prop,  g_prop,  L_prop)
-#
-#   ## 8.  MH‐ratio
-#   log_alpha <- (log_prop + log_q_rev) - (log_curr + log_q_fwd)
-#   accept    <- is.finite(log_alpha) && log(runif(1)) < log_alpha
-#
-#   list(psi = if (accept) prop else psi,
-#        accepted = accept)
-# }
-
-
-# mala_sample_psi <- function(psi, omega, beta,
-#                             sigma2, zeta2, Uop, tau2,
-#                             step_var) {
-#   p <- length(psi)
-#   # ensure omega is a p×p matrix
-#   omega <- if (is.matrix(omega)) omega else matrix(omega, p, p)
-#
-#   # small safeguard
-#   eps <- sqrt(pmax(step_var, 1e-10))    # ε
-#
-#   # 1) precompute Uβ
-#   Ubeta <- Uop$apply_U(beta)            # length-p
-#
-#   # 2) current metric Mdiag_j = 2*(Uβ)_j^2 e^{-2ψ_j}/(σ²ζ²) + Σ_k ω_{jk}/τ_j²
-#   Mdiag     <- 2 * (Ubeta^2) * exp(-2*psi) / (sigma2 * zeta2) +
-#     rowSums(omega) / tau2
-#   L_curr    <- 1 / sqrt(Mdiag)          # L_j = M^{-½}_{jj}
-#
-#   # 3) current gradient: ∂_j log p(ψ)
-#   term1     <-  (Ubeta^2) * exp(-2*psi) / (sigma2 * zeta2)
-#   diff_mat  <- sweep(matrix(psi, p, p), 2, psi, "-")
-#   term2     <- rowSums((omega * diff_mat) / tau2)
-#   g_curr    <-  term1 - term2 - 1       # +lik, -CAR, -linear
-#
-#   # 4) divergence of M^{-1}: ∂_j [1/Mdiag_j] = –M′/(Mdiag^2)
-#   #    M′_j = d/dψ_j [2(Uβ)_j^2 e^{-2ψ_j}/(σ²ζ²)] = -4(Uβ)^2 e^{-2ψ}/(σ²ζ²)
-#   dMdiag    <- -4 * (Ubeta^2) * exp(-2*psi) / (sigma2 * zeta2)
-#   div       <- - dMdiag / (Mdiag^2)
-#
-#   # 5) build the proposal
-#   drift     <- 0.5 * (eps^2) * (L_curr^2 * g_curr + div)
-#   prop      <- psi + drift + eps * L_curr * rnorm(p)
-#
-#   # 6) metric & gradient at the proposal
-#   Mdiag_p   <- 2 * (Ubeta^2) * exp(-2*prop) / (sigma2 * zeta2) +
-#     rowSums(omega) / tau2
-#   L_prop    <- 1 / sqrt(Mdiag_p)
-#
-#   term1_p   <- (Ubeta^2) * exp(-2*prop) / (sigma2 * zeta2)
-#   diff_mat_p<- sweep(matrix(prop, p, p), 2, prop, "-")
-#   term2_p   <- rowSums((omega * diff_mat_p) / tau2)
-#   g_prop    <- term1_p - term2_p - 1
-#
-#   # 7) log-posterior at current & proposed
-#   log_curr  <- log_posterior(psi,  omega, beta, sigma2, zeta2, Uop, tau2)
-#   log_prop  <- log_posterior(prop, omega, beta, sigma2, zeta2, Uop, tau2)
-#
-#   # 8) proposal densities q(prop|ψ) and q(ψ|prop)
-#   q_log <- function(to, from, grad_from, Lvec) {
-#     mu   <- from + 0.5 * (eps^2) * (Lvec^2 * grad_from)
-#     sum(dnorm(to, mean = mu, sd = eps * Lvec, log = TRUE))
-#   }
-#   log_q_fwd <- q_log(prop, psi,   g_curr, L_curr)
-#   log_q_rev <- q_log(psi,  prop,  g_prop, L_prop)
-#
-#   # 9) Jacobian correction: ½[log det M(prop) − log det M(ψ)]
-#   logdet_curr <- sum(log(Mdiag))
-#   logdet_prop <- sum(log(Mdiag_p))
-#
-#   # 10) MH acceptance ratio
-#   log_alpha <- (log_prop + log_q_rev + 0.5*(logdet_prop - logdet_curr)) -
-#     (log_curr + log_q_fwd)
-#   accept    <- is.finite(log_alpha) && (log(runif(1)) < log_alpha)
-#
-#   # 11) return new ψ
-#   list(psi      = if (accept) prop else psi,
-#        accepted = accept)
-# }
-
-mala_sample_psi <- function(psi, omega, beta,
-                            sigma2, zeta2, Uop, tau2,
-                            step_var) {
-  p <- length(psi)
-  # ensure omega is a p×p matrix
-  omega <- if (is.matrix(omega)) omega else matrix(omega, p, p)
-
-  # small safeguard
-  eps <- sqrt(pmax(step_var, 1e-10))    # ε
-
-  # 1) precompute Uβ
-  Ubeta <- Uop$apply_U(beta)            # length-p
-
-  # 2) current metric Mdiag_j = 2*(Uβ)_j^2 e^{-2ψ_j}/(σ²ζ²) + Σ_k ω_{jk}/τ_j²
-  Mdiag     <- 2 * (Ubeta^2) * exp(-2*psi) / (sigma2 * zeta2) +
-    rowSums(omega) / tau2
-  L_curr    <- 1 / sqrt(Mdiag)          # L_j = M^{-½}_{jj}
-
-  # 3) current gradient: ∂_j log p(ψ)
-  term1     <-  (Ubeta^2) * exp(-2*psi) / (sigma2 * zeta2)
-  diff_mat  <- sweep(matrix(psi, p, p), 2, psi, "-")
-  term2     <- rowSums((omega * diff_mat) / tau2)
-  g_curr    <-  term1 - term2 - 1       # +lik, -CAR, -linear
-
-  # 4) divergence of M^{-1}: ∂_j [1/Mdiag_j] = –M′/(Mdiag^2)
-  #    M′_j = d/dψ_j [2(Uβ)_j^2 e^{-2ψ_j}/(σ²ζ²)] = -4(Uβ)^2 e^{-2ψ}/(σ²ζ²)
-  dMdiag    <- -4 * (Ubeta^2) * exp(-2*psi) / (sigma2 * zeta2)
-  div       <- - dMdiag / (Mdiag^2)
-
-  # 5) build the proposal
-  drift     <- 0.5 * (eps^2) * (L_curr^2 * g_curr + div)
-  prop      <- psi + drift + eps * L_curr * rnorm(p)
-
-  # 6) metric & gradient at the proposal
-  Mdiag_p   <- 2 * (Ubeta^2) * exp(-2*prop) / (sigma2 * zeta2) +
-    rowSums(omega) / tau2
-  L_prop    <- 1 / sqrt(Mdiag_p)
-
-  term1_p   <- (Ubeta^2) * exp(-2*prop) / (sigma2 * zeta2)
-  diff_mat_p<- sweep(matrix(prop, p, p), 2, prop, "-")
-  term2_p   <- rowSums((omega * diff_mat_p) / tau2)
-  g_prop    <- term1_p - term2_p - 1
-
-
-  # 7) log-posterior at current & proposed
-  log_curr  <- log_posterior(psi,  omega, beta, sigma2, zeta2, Uop, tau2)
-  log_prop  <- log_posterior(prop, omega, beta, sigma2, zeta2, Uop, tau2)
-
-  # 8) proposal densities q(prop|ψ) and q(ψ|prop)
-  q_log <- function(to, from, grad_from, Lvec) {
-    mu   <- from + 0.5 * (eps^2) * (Lvec^2 * grad_from)
-    sum(dnorm(to, mean = mu, sd = eps * Lvec, log = TRUE))
-  }
-
-  ######################### Changed ###################
-  # q_log <- function(to, from, grad_from, div_from, Lvec) {
-  #   mu  <- from + 0.5*(eps^2)*(Lvec^2 * grad_from + div_from)
-  #   sum(dnorm(to, mean = mu, sd = eps * Lvec, log = TRUE))
-  # }
-
-
-  ############ nEW addition #########
-  # proposal divergence
-  # dMdiag_p <- -4*(Ubeta^2)*exp(-2*prop)/(sigma2*zeta2)
-  # div_prop <- - dMdiag_p / (Mdiag_p^2)
-  #################################################
-
-  log_q_fwd <- q_log(prop, psi,   g_curr, L_curr)
-  log_q_rev <- q_log(psi,  prop,  g_prop, L_prop)
-
-  # log_q_fwd <- q_log(prop, psi,   g_curr, div, L_curr)
-  # log_q_rev <- q_log(psi,  prop,  g_prop, div_prop, L_prop)
-
-  # 9) Jacobian correction: ½[log det M(prop) − log det M(ψ)]
-  logdet_curr <- sum(log(Mdiag))
-  logdet_prop <- sum(log(Mdiag_p))
-
-  # 10) MH acceptance ratio
-  # log_alpha <- log_prop - log_curr +
-  #   ( log_q_rev - log_q_fwd )
-  log_alpha <- (log_prop + log_q_rev + 0.5*(logdet_prop - logdet_curr)) -
-    (log_curr + log_q_fwd)
-  accept    <- is.finite(log_alpha) && (log(runif(1)) < log_alpha)
-
-  # 11) return new ψ
-  list(psi      = if (accept) prop else psi,
-       accepted = accept)
-}
 
 # ======================================================
 #  Helper:  quadratic form  Q_β  =  β' U Λ^{-1} U' β
@@ -830,12 +582,6 @@ sample_zeta2 <- function(beta, sigma2,
   1 / rgamma(1, shape = shape, rate = rate)
 }
 
-# sample_zeta2 <- function(beta,sigma2,Uop,psi,nu_shape,nu_rate){
-#   Qb    <- quad_form(beta,Uop,psi)
-#   shape <- nu_shape + length(beta)/2
-#   rate  <- Qb/(2*sigma2) + nu_rate
-#   1/rgamma(1,shape,rate)
-# }
 # ======================================================
 #  ν   | ζ²            —  Inverse‑Gamma (no change)
 # ======================================================
@@ -853,7 +599,7 @@ sample_tau2 <- function(a_tau, b_tau, omega, psi) {
   p     <- length(psi)
 
   # total unique‐edge weight
-  sum_w <- sum(omega[upper.tri(omega)])       # now ≈ number of non-isolated nodes / 2
+  sum_w <- sum(omega[upper.tri(omega)])       
 
   # quadratic form ψᵀQψ via pairwise diffs
   diff2   <- outer(psi, psi, "-")^2
@@ -1009,34 +755,6 @@ run_gibbs_sampler <- function(X, y, n_iter = 10000, c = 100) {
     params$beta  <- params$beta  - mean(params$beta )   # after each update
 
 
-    ## ---- ψ | rest   (one full MALA sweep) ----------------------
-    # res <- mala_sample_psi(
-    #   psi      = params$psi,
-    #   omega    = params$omega,
-    #   beta     = params$beta,
-    #   sigma2   = params$sigma2,
-    #   zeta2    = params$zeta2,
-    #   Uop      = Uop,
-    #   tau2     = params$tau2,
-    #   step_var = params$step_var)
-    #
-    # params$psi <- res$psi
-
-
-    # params$psi <- update_psi_slice(psi      = params$psi,
-    #                         omega    = params$omega,
-    #                         beta     = params$beta,
-    #                         sigma2   = params$sigma2,
-    #                         zeta2    = params$zeta2,
-    #                         Uop      = Uop,
-    #                         tau2     = params$tau2)
-    # params$psi <- update_psi_elliptical (psi = params$psi,
-    #                        omega =params$omega,
-    #                        beta = params$beta,
-    #                        sigma = params$sigma2,
-    #                        zeta2 = params$zeta2,
-    #                        Uop = Uop,
-    #                        tau2 = params$tau2)
     slice_freq = 100
     if (iter %% slice_freq == 0) {
       params$psi <- update_psi_slice(
@@ -1129,42 +847,6 @@ run_gibbs_sampler <- function(X, y, n_iter = 10000, c = 100) {
       rs[rs > 0],
       "/"
     )
-    #
-    ## --- 2. HARD-clip micro-edges *before* scaling ----------------------------
-    # eps <- 1e-3                               # threshold (tune 1e-3–1e-4)
-    # omega_raw[omega_raw < eps] <- 0
-    # ## --- 4. row-normalise only non-empty rows --------------------------------
-    # rs <- rowSums(omega_raw)                  # row totals after clipping
-    # nz <- rs > 0                              # rows that still have ≥1 edge
-    # omega_raw[nz, ] <- sweep(omega_raw[nz, , drop = FALSE],
-    #                          1, rs[nz], "/") # divide by row sum
-    # rows with rs == 0 stay all-zero
-    ############################# New code ############################
-    # eps <- 1e-3                        # 1.  absolute cut-off (tune 1e-3–5e-3)
-    #
-    # ## --- A. hard-clip ---------------------------------------------------------
-    # omega_raw[omega_raw < eps] <- 0           # remove micro-edges
-    #
-    # ## --- B. row totals AFTER clipping ----------------------------------------
-    # rs <- rowSums(omega_raw)                  # (may be 0, <1, or >1)
-    #
-    # ## --- C. rescale rows whose sum exceeds 1 ---------------------------------
-    # gt1 <- rs > 1                             # only these rows would shrink edges
-    # omega_raw[gt1, ] <- sweep(omega_raw[gt1, , drop = FALSE],
-    #                           1, rs[gt1], "/")    # divide by row sum
-    #
-    # ## --- D. second clip (guards against round-off) ---------------------------
-    # omega_raw[omega_raw < eps] <- 0           # kills any < eps created by C
-    #
-    # ## --- E. re-normalise rows changed in D (very few) ------------------------
-    # rs  <- rowSums(omega_raw)
-    # nz  <- rs > 0
-    # omega_raw[nz, ] <- sweep(omega_raw[nz, , drop = FALSE],
-    #                          1, rs[nz], "/")
-    # # rows with rs == 0 remain all-zero
-
-    ####################################################################
-
     params$omega_deg <- rs
     params$omega <-omega_raw
     # now recalibrate the τ² hyperprior
