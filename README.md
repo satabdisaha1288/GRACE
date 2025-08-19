@@ -1,4 +1,4 @@
-# 📊 Graph-Adaptive Horseshoe for Compositional Regression
+# 📊 GRaph Adaptive horseshoe for Compositional REgression (GRACE)
 
 This repository provides the implementation for the **Graph-Adaptive Horseshoe** model, a Bayesian variable selection method tailored for **high-dimensional compositional data** such as microbiome relative abundances.
 
